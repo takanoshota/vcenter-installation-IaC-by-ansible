@@ -1,0 +1,20 @@
+all:
+  vars:
+    internet_ntpserver: "xxx.xxx.xxx.com"
+    homelab_default_gw: "192.168.10.1"
+    homelab_dnsserver: "192.168.10.100" 
+    esxi_hostname: esxi.myhomelab.example.com
+    esxi_username: root
+    esxi_password: xxxxxxxxx
+    esxi_address: "192.168.10.60"
+    vcsa_ova_file_path: /path/to/your/ova/VMware-vCenter-Server-Appliance-7.0.3xxxxxxx.ova
+    vcsa_hostname: vcsa.myhomelab.example.com
+    vcsa_username: administrator@vsphere.local
+    vcsa_password: xxxxxxxxx
+    vcsa_datastore: usb-ssd
+    vcsa_deploy_size: small
+    vcsa_portgroup: "VM Network"
+    vcsa_ipaddress: "192.168.10.90"
+    vcsa_license: xxxxx-xxxxx-xxxxx-xxxxx-xxxxx
+    vcsa_datacenter: "myhomelab_datacenter"
+    vcsa_cluster: "myhomelab_cluster"

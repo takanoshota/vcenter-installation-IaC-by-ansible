@@ -1,0 +1,99 @@
+- name: Deploy vCenter VM 
+  hosts: localhost
+  connection: local
+  become: yes
+  gather_facts: false
+  tasks:
+    - debug:
+        var: vcsa_hostname.split('.')[0] 
+    - name: Deploy from OVA
+      vmware_deploy_ovf:
+        hostname: "{{ esxi_address }}"   
+        username: "{{ esxi_username }}"
+        password: "{{ esxi_password }}"
+        name: "{{ vcsa_hostname.split('.')[0] }}" # vmname returned by Get-VM of PowerCLI
+        datastore: "{{ vcsa_datastore }}"            
+        deployment_option: "{{ vcsa_deploy_size }}" # size definitions are refferd to in https://docs.vmware.com/en/VMware-vSphere/7.0/com.vmware.vcenter.upgrade.doc/GUID-88571D8A-46E1-464D-A349-4DC43DCAF320.html
+        disk_provisioning: "thin"
+        networks:
+          "Network 1": "{{ vcsa_portgroup }}" 
+        ovf: "{{ vcsa_ova_file_path }}"             # abs path to ova file
+        wait_for_ip_address: true                    # wait untill IP address is assigined successfully
+        validate_certs: no
+        inject_ovf_env: true  # if true, properties below are automatically input after initial boot
+        properties:
+          guestinfo.cis.appliance.net.addr.family: "ipv4" # ipv4 or ipv6
+          guestinfo.cis.appliance.net.mode: "static"      # static or dhcp
+          guestinfo.cis.appliance.net.addr: "{{ vcsa_ipaddress }}"
+          guestinfo.cis.appliance.net.pnid: "{{ vcsa_hostname }}" # FQDN
+          guestinfo.cis.appliance.net.prefix: "{{ vyos_prefix_wan_eth0 | regex_replace('/','') }}" # in my environment, convert /24 -> 24
+          guestinfo.cis.appliance.net.gateway: "{{ homelab_default_gw }}"
+          guestinfo.cis.appliance.net.dns.servers: "{{ homelab_dnsserver }}" # Comma separated list
+          guestinfo.cis.appliance.root.passwd: "{{ vcsa_password }}"  # root password when you access vcsa via ssh and vCenter Server Management Interface(port 5480)
+          guestinfo.cis.appliance.root.shell: "true"
+          guestinfo.cis.appliance.ssh.enabled: "true"
+          guestinfo.cis.appliance.ntp.servers: "{{ internet_ntpserver }}"     # Comma separated list
+          guestinfo.cis.ceip_enabled: "False" #whether if you activate Customer Experience Improvement Program
+          guestinfo.cis.deployment.autoconfig: "True" # if true, properties below are automatically input after initial boot
+          guestinfo.cis.vmdir.username: "{{ vcsa_username }}"    # username for vcenter local SSO i.e. administrator@vsphere.local
+          guestinfo.cis.vmdir.domain-name: "{{ vcsa_username.split('@')[1] }}" 
+          guestinfo.cis.vmdir.password: "{{ vcsa_password }}"    # password for administrator@vsphere.local which is used for vSphere API and vSphere Web Client
+          domain: "{{  vcsa_hostname.split('.')[1:] | join('.') }}" 
+          searchpath: ""
+      delegate_to: localhost
+
+    - name: Wait for vCenter VM installation finished
+      vmware_about_info:
+        hostname: "{{ vcsa_ipaddress }}"
+        username: "{{ vcsa_username }}"
+        password: "{{ vcsa_password }}"
+        validate_certs: no
+      delegate_to: localhost
+      retries: 60
+      delay: 60
+      register: result
+      until: result is succeeded
+
+    - name: Add a new vCenter license
+      vcenter_license:
+        hostname: "{{ vcsa_ipaddress }}"
+        username: "{{ vcsa_username }}"
+        password: "{{ vcsa_password }}"
+        license: "{{ vcsa_license }}"
+        state: present
+        validate_certs: no
+      delegate_to: localhost
+
+    - name: Create Datacenter
+      community.vmware.vmware_datacenter:
+        hostname: '{{ vcsa_hostname }}'
+        username: '{{ vcsa_username }}'
+        password: '{{ vcsa_password }}'
+        datacenter_name: '{{ vcsa_datacenter }}'
+        state: present
+        validate_certs: no
+      delegate_to: localhost
+
+    - name: Create Cluster
+      community.vmware.vmware_cluster:
+        hostname: '{{ vcsa_hostname }}'
+        username: '{{ vcsa_username }}'
+        password: '{{ vcsa_password }}'
+        datacenter_name: '{{ vcsa_datacenter }}'
+        cluster_name: '{{ vcsa_cluster }}'
+        state: present
+        validate_certs: no
+      delegate_to: localhost
+
+    - name: Add ESXi Host to vCenter
+      vmware_host:
+        hostname: '{{ vcsa_ipaddress }}'
+        username: '{{ vcsa_username }}'
+        password: '{{ vcsa_password }}'
+        datacenter_name: '{{ vcsa_datacenter }}'
+        cluster_name: '{{ vcsa_cluster }}'
+        esxi_hostname: '{{ esxi_hostname }}'
+        esxi_username: '{{ esxi_username }}'
+        esxi_password: '{{ esxi_password }}'
+        state: present
+        validate_certs: no
