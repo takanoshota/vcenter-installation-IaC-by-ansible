@@ -11,4 +11,5 @@ https://medium.com/p/9d3db954c903/
   Ansible Inventory file
 
 - deploy_vcsa.yaml
+
   Playbook
